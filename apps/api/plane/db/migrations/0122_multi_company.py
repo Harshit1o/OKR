@@ -15,6 +15,7 @@ def drop_legacy_workspace_data(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ("db", "0121_alter_estimate_type"),
