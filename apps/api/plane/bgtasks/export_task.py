@@ -16,10 +16,19 @@ from celery import shared_task
 # Django imports
 from django.conf import settings
 from django.utils import timezone
-from django.db.models import Prefetch
+from django.db.models import Count, OuterRef, Prefetch, Subquery, IntegerField
+from django.db.models.functions import Coalesce
 
 # Module imports
-from plane.db.models import ExporterHistory, Issue, IssueComment, IssueRelation, IssueSubscriber
+from plane.db.models import (
+    ExporterHistory,
+    FileAsset,
+    Issue,
+    IssueComment,
+    IssueLink,
+    IssueRelation,
+    IssueSubscriber,
+)
 from plane.utils.exception_logger import log_exception
 from plane.utils.porters.exporter import DataExporter
 from plane.utils.porters.serializers.issue import IssueExportSerializer
@@ -144,6 +153,32 @@ def issue_export_task(
         exporter_instance.status = "processing"
         exporter_instance.save(update_fields=["status"])
 
+        # Subqueries for counts so the serializer's read-only IntegerFields resolve.
+        sub_issues_subquery = (
+            Issue.issue_objects.filter(parent=OuterRef("id"))
+            .order_by()
+            .values("parent")
+            .annotate(count=Count("*"))
+            .values("count")
+        )
+        link_subquery = (
+            IssueLink.objects.filter(issue=OuterRef("id"))
+            .order_by()
+            .values("issue")
+            .annotate(count=Count("*"))
+            .values("count")
+        )
+        attachment_subquery = (
+            FileAsset.objects.filter(
+                issue_id=OuterRef("id"),
+                entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+            )
+            .order_by()
+            .values("issue_id")
+            .annotate(count=Count("*"))
+            .values("count")
+        )
+
         # Build base queryset for issues
         workspace_issues = (
             Issue.objects.filter(
@@ -159,6 +194,8 @@ def issue_export_task(
                 "state",
                 "created_by",
                 "estimate_point",
+                "parent",
+                "parent__project",
             )
             .prefetch_related(
                 "labels",
@@ -166,6 +203,7 @@ def issue_export_task(
                 "issue_module__module",
                 "assignees",
                 "issue_link",
+                "label_issue__label",
                 Prefetch(
                     "issue_subscribers",
                     queryset=IssueSubscriber.objects.select_related("subscriber"),
@@ -182,10 +220,11 @@ def issue_export_task(
                     "issue_related",
                     queryset=IssueRelation.objects.select_related("issue", "issue__project"),
                 ),
-                Prefetch(
-                    "parent",
-                    queryset=Issue.objects.select_related("type", "project"),
-                ),
+            )
+            .annotate(
+                sub_issues_count=Coalesce(Subquery(sub_issues_subquery, output_field=IntegerField()), 0),
+                link_count=Coalesce(Subquery(link_subquery, output_field=IntegerField()), 0),
+                attachment_count=Coalesce(Subquery(attachment_subquery, output_field=IntegerField()), 0),
             )
         )
 
