@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { Button, getButtonStyling } from "@plane/propel/button";
@@ -27,6 +28,8 @@ const CreateWorkspacePage = observer(function CreateWorkspacePage() {
   const { t } = useTranslation();
   // router
   const router = useAppRouter();
+  const searchParams = useSearchParams();
+  const companySlug = searchParams?.get("company") ?? undefined;
   // store hooks
   const { config } = useInstance();
   const { data: currentUser } = useUser();
@@ -102,6 +105,7 @@ const CreateWorkspacePage = observer(function CreateWorkspacePage() {
                   onSubmit={onSubmit}
                   defaultValues={defaultValues}
                   setDefaultValues={setDefaultValues}
+                  companySlug={companySlug}
                 />
               </div>
             </div>

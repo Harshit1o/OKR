@@ -35,6 +35,7 @@ type Props = {
     loading: string;
     default: string;
   };
+  companySlug?: string;
 };
 
 const workspaceService = new WorkspaceService();
@@ -50,6 +51,7 @@ export const CreateWorkspaceForm = observer(function CreateWorkspaceForm(props: 
       loading: "workspace_creation.button.loading",
       default: "workspace_creation.button.default",
     },
+    companySlug,
   } = props;
   // states
   const [slugError, setSlugError] = useState(false);
@@ -73,7 +75,8 @@ export const CreateWorkspaceForm = observer(function CreateWorkspaceForm(props: 
       if (res.status === true && !RESTRICTED_URLS.includes(formData.slug)) {
         setSlugError(false);
         try {
-          const workspaceResponse = await createWorkspace(formData);
+          const payload = companySlug ? ({ ...formData, company_slug: companySlug } as Partial<IWorkspace>) : formData;
+          const workspaceResponse = await createWorkspace(payload);
           setToast({
             type: TOAST_TYPE.SUCCESS,
             title: t("workspace_creation.toast.success.title"),

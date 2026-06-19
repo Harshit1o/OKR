@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 from .base import BaseSerializer
+from .company import CompanySerializer, CompanyMembershipSerializer
 from .user import (
     UserSerializer,
     UserLiteSerializer,

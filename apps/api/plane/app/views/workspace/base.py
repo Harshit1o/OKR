@@ -35,6 +35,8 @@ from plane.app.permissions import (
 from plane.app.serializers import WorkSpaceSerializer, WorkspaceThemeSerializer
 from plane.app.views.base import BaseAPIView, BaseViewSet
 from plane.db.models import (
+    Company,
+    CompanyMembership,
     Issue,
     IssueActivity,
     Workspace,
@@ -97,6 +99,28 @@ class WorkSpaceViewSet(BaseViewSet):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+            company_slug = request.data.get("company_slug") or request.data.get("company")
+            if not company_slug:
+                return Response(
+                    {"error": "company_slug is required to create a workspace"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            membership = CompanyMembership.objects.filter(
+                company__slug=company_slug, member=request.user, is_active=True
+            ).select_related("company").first()
+            if not membership:
+                return Response(
+                    {"error": "You are not a member of this company"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            # Only Owner/Admin in the company may create new workspaces.
+            if membership.role < 15:
+                return Response(
+                    {"error": "Only company admins can create workspaces"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             serializer = WorkSpaceSerializer(data=request.data)
 
             slug = request.data.get("slug", False)
@@ -121,7 +145,7 @@ class WorkSpaceViewSet(BaseViewSet):
                 )
 
             if serializer.is_valid(raise_exception=True):
-                serializer.save(owner=request.user)
+                serializer.save(owner=request.user, company=membership.company)
                 # Create Workspace member
                 _ = WorkspaceMember.objects.create(
                     workspace_id=serializer.data["id"],

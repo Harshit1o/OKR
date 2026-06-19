@@ -133,6 +133,11 @@ class Workspace(BaseModel):
         on_delete=models.CASCADE,
         related_name="owner_workspace",
     )
+    company = models.ForeignKey(
+        "db.Company",
+        on_delete=models.CASCADE,
+        related_name="workspaces",
+    )
     slug = models.SlugField(max_length=48, db_index=True, unique=True, validators=[slug_validator])
     organization_size = models.CharField(max_length=20, blank=True, null=True)
     timezone = models.CharField(max_length=255, default="UTC", choices=TIMEZONE_CHOICES)
