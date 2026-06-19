@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 // plane imports
@@ -46,6 +46,69 @@ const defaultValues: FormValues = {
   ],
 };
 
+type TBulkMemberPickerProps = {
+  options:
+    | {
+        value: string;
+        query: string;
+        content: React.ReactNode;
+      }[]
+    | undefined;
+  existingMemberIds: string[];
+  onAppend: (memberIds: string[]) => void;
+};
+
+function BulkMemberPicker({ options, existingMemberIds, onAppend }: TBulkMemberPickerProps) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+
+  const existingSet = new Set(existingMemberIds);
+  const availableOptions = (options ?? []).filter((opt) => !existingSet.has(opt.value));
+
+  const handleAdd = () => {
+    onAppend(selected);
+    setSelected([]);
+    setOpen(false);
+  };
+
+  if (!availableOptions || availableOptions.length === 0) return null;
+
+  return (
+    <div className="rounded-md border border-subtle bg-layer-1 px-3 py-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-13 font-medium text-secondary hover:text-primary"
+      >
+        <span>Bulk add — pick multiple workspace members</span>
+        <span className="text-11 text-tertiary">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="grow">
+            <CustomSearchSelect
+              value={selected}
+              onChange={(val: string[]) => setSelected(val)}
+              options={availableOptions}
+              input
+              multiple
+              label={
+                selected.length > 0
+                  ? `${selected.length} member${selected.length === 1 ? "" : "s"} selected`
+                  : "Select members"
+              }
+              optionsClassName="max-w-[400px]"
+            />
+          </div>
+          <Button type="button" variant="primary" size="sm" onClick={handleAdd} disabled={selected.length === 0}>
+            Add to invitations
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const SendProjectInvitationModal = observer(function SendProjectInvitationModal(props: Props) {
   const { isOpen, onClose, onSuccess, projectId, workspaceSlug } = props;
   // plane hooks
@@ -82,22 +145,20 @@ export const SendProjectInvitationModal = observer(function SendProjectInvitatio
 
     const payload = { ...formData };
 
-    await bulkAddMembersToProject(workspaceSlug.toString(), projectId.toString(), payload)
-      .then(() => {
-        if (onSuccess) onSuccess();
-        onClose();
-        setToast({
-          title: "Success!",
-          type: TOAST_TYPE.SUCCESS,
-          message: "Members added successfully.",
-        });
-      })
-      .catch((error) => {
-        console.error(error);
-      })
-      .finally(() => {
-        reset(defaultValues);
+    try {
+      await bulkAddMembersToProject(workspaceSlug.toString(), projectId.toString(), payload);
+      if (onSuccess) onSuccess();
+      onClose();
+      setToast({
+        title: "Success!",
+        type: TOAST_TYPE.SUCCESS,
+        message: "Members added successfully.",
       });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      reset(defaultValues);
+    }
   };
 
   const handleClose = () => {
@@ -182,9 +243,35 @@ export const SendProjectInvitationModal = observer(function SendProjectInvitatio
             <p className="text-13 text-secondary">{t("project_settings.members.invite_members.sub_heading")}</p>
           </div>
 
+          <BulkMemberPicker
+            options={options}
+            existingMemberIds={fields.map((f) => f.member_id).filter(Boolean)}
+            onAppend={(memberIds) => {
+              if (memberIds.length === 0) return;
+              const current = (watch("members") || []) as { member_id: string; role: EUserPermissions }[];
+              const hasEmptyLeadingRow = current.length === 1 && (current[0]?.member_id ?? "") === "";
+              if (hasEmptyLeadingRow) remove(0);
+              append(
+                memberIds.map((mid) => {
+                  const workspaceRole = getWorkspaceMemberDetails(mid)?.role ?? 5;
+                  const roleKey = ROLE[workspaceRole].toUpperCase();
+                  return {
+                    member_id: mid,
+                    role: EUserPermissions[roleKey as keyof typeof EUserPermissions],
+                  };
+                })
+              );
+              setToast({
+                type: TOAST_TYPE.SUCCESS,
+                title: "Added",
+                message: `${memberIds.length} member${memberIds.length === 1 ? "" : "s"} added.`,
+              });
+            }}
+          />
+
           <div className="mb-3 space-y-4">
-            {fields.map((field, index) => (
-              <div key={field.id} className="group mb-1 flex w-full items-start justify-between gap-x-4 text-13">
+            {fields.map((entry, index) => (
+              <div key={entry.id} className="group mb-1 flex w-full items-start justify-between gap-x-4 text-13">
                 <div className="flex w-full grow flex-col gap-1">
                   <Controller
                     control={control}

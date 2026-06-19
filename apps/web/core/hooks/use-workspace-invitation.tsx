@@ -42,6 +42,7 @@ type TUseWorkspaceInvitationReturn = {
   onFormSubmit: () => void;
   handleClose: () => void;
   appendField: () => void;
+  appendBulkEmails: (emails: string[]) => void;
 };
 
 export const useWorkspaceInvitationActions = (props: TUseWorkspaceInvitationProps): TUseWorkspaceInvitationReturn => {
@@ -68,10 +69,17 @@ export const useWorkspaceInvitationActions = (props: TUseWorkspaceInvitationProp
     append({ email: "", role: EUserPermissions.MEMBER });
   };
 
+  const appendBulkEmails = (emails: string[]) => {
+    if (emails.length === 0) return;
+    const current = watch("emails") || [];
+    const hasEmptyLeadingRow = current.length === 1 && (current[0]?.email ?? "").trim() === "";
+    if (hasEmptyLeadingRow) remove(0);
+    append(emails.map((email) => ({ email, role: EUserPermissions.MEMBER })));
+  };
+
   const onSubmitForm = async (data: InvitationFormValues) => {
-    await onSubmit(data)?.then(() => {
-      reset(SEND_WORKSPACE_INVITATION_MODAL_DEFAULT_VALUES);
-    });
+    await onSubmit(data);
+    reset(SEND_WORKSPACE_INVITATION_MODAL_DEFAULT_VALUES);
   };
 
   useEffect(() => {
@@ -87,5 +95,6 @@ export const useWorkspaceInvitationActions = (props: TUseWorkspaceInvitationProp
     onFormSubmit: handleSubmit(onSubmitForm),
     handleClose,
     appendField,
+    appendBulkEmails,
   };
 };

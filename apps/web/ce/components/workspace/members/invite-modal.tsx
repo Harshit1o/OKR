@@ -13,6 +13,7 @@ import type { IWorkspaceBulkInviteFormData } from "@plane/types";
 import { EModalWidth, EModalPosition, ModalCore } from "@plane/ui";
 // components
 import { InvitationModalActions } from "@/components/workspace/invite-modal/actions";
+import { BulkEmailPanel } from "@/components/workspace/invite-modal/bulk-email-panel";
 import { InvitationFields } from "@/components/workspace/invite-modal/fields";
 import { InvitationForm } from "@/components/workspace/invite-modal/form";
 // hooks
@@ -33,10 +34,11 @@ export const SendWorkspaceInvitationModal = observer(function SendWorkspaceInvit
   // router
   const { workspaceSlug } = useParams();
   // derived values
-  const { control, fields, formState, remove, onFormSubmit, handleClose, appendField } = useWorkspaceInvitationActions({
-    onSubmit,
-    onClose,
-  });
+  const { control, fields, formState, remove, onFormSubmit, handleClose, appendField, appendBulkEmails } =
+    useWorkspaceInvitationActions({
+      onSubmit,
+      onClose,
+    });
 
   return (
     <ModalCore isOpen={isOpen} position={EModalPosition.TOP} width={EModalWidth.XXL}>
@@ -53,6 +55,7 @@ export const SendWorkspaceInvitationModal = observer(function SendWorkspaceInvit
         }
         className="p-5"
       >
+        <BulkEmailPanel existingEmails={fields.map((f) => f.email)} onAppend={appendBulkEmails} />
         <InvitationFields
           workspaceSlug={workspaceSlug.toString()}
           fields={fields}
